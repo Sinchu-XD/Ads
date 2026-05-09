@@ -132,7 +132,10 @@ async def send_broadcast_for_user(bot, user):
                 try:
                     dm_contacts = []
                     async for dialog in client.get_dialogs():
-                        if dialog.chat.type == ChatType.PRIVATE and not dialog.chat.is_self:
+                        if (
+                            dialog.chat.type == ChatType.PRIVATE
+                            and not getattr(dialog.chat, 'is_self', False)
+                         ):
                             dm_contacts.append(dialog.chat)
                         if len(dm_contacts) >= 10:
                             break
