@@ -111,23 +111,30 @@ async def send_broadcast_for_user(bot, user):
             if not groups:
                 return
 
-            index = fresh_user.last_target_index
-            if index >= len(groups):
-                index = 0
-
-            target_group = groups[index]
             keyboard = build_pyrogram_keyboard(template.buttons_json)
 
-            try:
-                sent = await try_send_to_group(client, target_group, template.message_text, keyboard)
-                if sent:
-                    logger.info(f"✅ Sent to '{target_group.title}' for user {fresh_user.telegram_user_id}")
-                fresh_user.last_target_index = index + 1
-                await db.commit()
-            except FloodWait as e:
-                logger.warning(f"[broadcaster] FloodWait {e.value}s for user {fresh_user.telegram_user_id}")
-                await asyncio.sleep(e.value + 2)
+            # ✅ Loop through ALL groups with 45s delay between each
+            for target_group in groups:
+                # Re-check if user stopped broadcasting mid-cycle
+                check_res = await db.execute(select(UserSettings).filter(UserSettings.telegram_user_id == fresh_user.telegram_user_id))
+                check_user = check_res.scalars().first()
+                if not check_user or not check_user.is_broadcasting:
+                    logger.info(f"[broadcaster] User {fresh_user.telegram_user_id} stopped mid-cycle, halting.")
+                    return
 
+                try:
+                    sent = await try_send_to_group(client, target_group, template.message_text, keyboard)
+                    if sent:
+                        logger.info(f"✅ Sent to '{target_group.title}' for user {fresh_user.telegram_user_id}")
+                except FloodWait as e:
+                    logger.warning(f"[broadcaster] FloodWait {e.value}s for user {fresh_user.telegram_user_id}")
+                    await asyncio.sleep(e.value + 5)  # ✅ +5s buffer (was +2)
+
+                await asyncio.sleep(45)  # ✅ 45 sec delay per group to avoid flood
+
+            await db.commit()
+
+            # ✅ DM Broadcast
             if fresh_user.dm_broadcast_enabled:
                 try:
                     dm_contacts = []
@@ -135,16 +142,16 @@ async def send_broadcast_for_user(bot, user):
                         if (
                             dialog.chat.type == ChatType.PRIVATE
                             and not getattr(dialog.chat, 'is_self', False)
-                         ):
+                        ):
                             dm_contacts.append(dialog.chat)
                         if len(dm_contacts) >= 10:
                             break
                     for contact in dm_contacts:
                         try:
                             await client.send_message(chat_id=contact.id, text=template.message_text, reply_markup=keyboard)
-                            await asyncio.sleep(2)
+                            await asyncio.sleep(5)  # ✅ 5s between DMs (was 2s)
                         except FloodWait as e:
-                            await asyncio.sleep(e.value + 2)
+                            await asyncio.sleep(e.value + 5)  # ✅ +5s buffer (was +2)
                         except Exception as dm_err:
                             logger.warning(f"[broadcaster] DM to {contact.id} failed: {dm_err}")
                 except Exception as e:
@@ -161,10 +168,10 @@ async def background_broadcaster(bot):
                 active_users = result.scalars().all()
             for user in active_users:
                 await send_broadcast_for_user(bot, user)
-                await asyncio.sleep(3)
+                await asyncio.sleep(5)  # ✅ Small gap between users (was 3s)
         except Exception as e:
             logger.error(f"[broadcaster] Worker error: {e}")
-        await asyncio.sleep(300)
+        await asyncio.sleep(60)  # ✅ Short rest between full cycles (was 300s)
 
 async def main():
     await init_db()
