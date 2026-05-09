@@ -471,4 +471,4 @@ async def toggle_dm_broadcast(call: CallbackQuery):
         status = "ON 🟢" if settings.dm_broadcast_enabled else "OFF 🔴"
         await call.answer(f"DM Broadcast {status}")
 
-    await show_broadcast_dashboard(call, FSMContext)
+    await show_broadcast_dashboard(call, state)
