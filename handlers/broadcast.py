@@ -454,7 +454,7 @@ async def handle_dm_broadcast(message: Message):
             logger.error(f"DM Broadcast Error: {e}")
 
 @router.callback_query(F.data == "toggle_dm_broadcast")
-async def toggle_dm_broadcast(call: CallbackQuery):
+async def toggle_dm_broadcast(call: CallbackQuery, state: FSMContext):
     async with SessionLocal() as db:
         res = await db.execute(
             select(UserSettings).filter(UserSettings.telegram_user_id == call.from_user.id)
