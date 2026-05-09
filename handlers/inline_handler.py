@@ -1,4 +1,4 @@
-from aiogram import Router, F
+from aiogram import Router
 from aiogram.types import (
     InlineQuery, InlineQueryResultArticle, InputTextMessageContent,
     InlineKeyboardMarkup, InlineKeyboardButton
@@ -10,15 +10,10 @@ import json
 
 router = Router()
 
-
 @router.inline_query()
 async def handle_inline_query(inline_query: InlineQuery):
-    """Returns the user's saved broadcast template as an inline result."""
-
     query_text = inline_query.query.strip()
 
-    # Extract user_id from query string (sent by background_broadcaster)
-    # or fall back to the person typing inline
     if query_text.startswith("broadcast_"):
         try:
             user_id = int(query_text.replace("broadcast_", ""))
@@ -34,10 +29,6 @@ async def handle_inline_query(inline_query: InlineQuery):
             )
             settings = settings_res.scalars().first()
 
-            # FIX: Only block inline results when settings row EXISTS and is_broadcasting is
-            # explicitly False. If settings is None (unlikely during background broadcast
-            # because background_broadcaster already verified is_broadcasting=True), allow
-            # through so we don't silently drop messages.
             if settings is not None and not settings.is_broadcasting:
                 await inline_query.answer(
                     results=[],
@@ -61,7 +52,6 @@ async def handle_inline_query(inline_query: InlineQuery):
                 )
                 return
 
-            # Build inline keyboard from saved buttons JSON
             keyboard = None
             if template.buttons_json:
                 try:
@@ -76,7 +66,6 @@ async def handle_inline_query(inline_query: InlineQuery):
                 except Exception as e:
                     logger.warning(f"[inline] Failed to parse buttons for user {user_id}: {e}")
 
-            # Safe preview — strip HTML tags for description
             description = template.message_text[:120].replace("<", "").replace(">", "")
 
             result = InlineQueryResultArticle(
@@ -90,10 +79,7 @@ async def handle_inline_query(inline_query: InlineQuery):
                 reply_markup=keyboard
             )
 
-            await inline_query.answer(
-                results=[result],
-                cache_time=0
-            )
+            await inline_query.answer(results=[result], cache_time=0)
 
         except Exception as e:
             logger.error(f"[inline] Query error for user {user_id}: {e}")
