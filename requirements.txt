@@ -1,0 +1,10 @@
+aiogram==3.13.0
+pyrogram==2.0.106
+TgCrypto==1.2.5
+asyncpg==0.29.0
+SQLAlchemy==2.0.36
+cryptography==43.0.3
+python-dotenv==1.0.1
+apscheduler==3.10.4
+
+# Do NOT pin pydantic or pydantic-core manually — let aiogram decide
